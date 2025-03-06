@@ -1,0 +1,84 @@
+---
+title: "London Weather 1979-2023" 
+subtitle: "Coursework 1 -- 210206803" 
+author: "Eghonghon Ighodalo" 
+date: "17/03/2025" 
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: spacelab 
+    highlight: tango
+---
+ 
+```{r, echo=FALSE}
+# This code will display the QMUL logo at the top right of the page
+# Do not change this code
+htmltools::img(src = knitr::image_uri("images/QMlogo.png"),
+               alt = 'logo',
+               style = 'position:absolute; top:0; right:0; padding:10px; width:20%;')
+```
+
+# London Weather from years 1979-2023
+
+This data shows daily weather recordings over about 50 years. Initially there were various sub-datasets, such as precipitation and global radiation, but I decided to use maximum daily temperature for this first time series analysis since it is shows changes that are noticeable and most people are aware of. 
+
+
+```{r}
+library(prophet)
+library(lubridate)
+london_weather = read.csv("data/london_weather_data_1979_to_2023.csv")
+daily_temp = data.frame(ds = lubridate::ymd(london_weather$DATE),
+                        y = london_weather$TX)
+m = prophet::prophet(daily_temp)
+f = make_future_dataframe(m, periods = 3650, freq = "day")
+p = predict(m, f)
+plot(m, p)
+```
+
+Here I first created a data frame in order to isolate the Years and maximum temperature values that I wanted to use for the analysis. I used simple variables so that I could test that the data could be plot properly. I then experimented with larger periods. It is expected that temperature will increase in the next years, but I was curious to see how the prophet function would predict the increases to be.  
+I was able to use a new function 'lubridate' in order to format my dates, which are written as integers in the excel file. This was necessary so that I could create the data frame to begin the time series analysis.
+
+```{r}
+fifteen_year_prediction = make_future_dataframe(m, periods = 5479, freq="day")
+predict_next_15_years = predict(m, 
+                                fifteen_year_prediction)
+plot(m, predict_next_15_years, xlab="Years", ylab="Temperature in 0.1 degrees celcius")
+```
+
+# Time Series Analysis
+
+I fit the data frame to a time series so that I would be able to perform various analysis of the trends and seasonality that the data may have. In this data the values are written to a degree of 0.1 degrees Celsius, so a reading of 400, would be equal to 40 degrees Celsius. 
+
+```{r}
+library(zoo)
+time_series = read.zoo(daily_temp)
+ts_time_series = ts(time_series, start = 1990, frequency = 365)
+class(ts_time_series)
+class(time_series)
+plot(ts_time_series)
+plot(time_series)
+```
+
+I made sure to check the classes of the variables so that they displayed 'zoo' and 'ts' respectively. When I received confirmation of this I was able to then begin using some of the de-trending methods to begin the time series analysis. 
+
+```{r}
+HW_method = HoltWinters(ts_time_series)
+plot(HW_method)
+HW_predict = predict(HW_method, 3650)
+plot(HW_method, HW_predict)
+```
+
+Visually, I can see that the Holt Winters method follows the same general pattern as the time series, and there are no obvious deviations from this trend. I have only used the additive model since the data has a seasonal cycle rather than cumulative. However it definitely has fewer spikes than the original series which shows that it has helped to smooth it. 
+
+```{r}
+detrend = stats::decompose(ts_time_series)
+plot(detrend)
+```
+
+Using the decompose function has allowed the time series to be shown in its separate components as a moving average. The trend shows a gentle slope that is increasing and aligns with what we know of temperature from the 1900s till now. The seasonal graph highlights the yearly trend of temperature in London, with the highs signifying summer and the lows winter. The residuals are quite constant and seem equidistant to the 0 line which is good.
+
+When I used the `{r}plot(diff(ts_time_series))` function, there wasn't a great shift in trendiness. This shows that the daily shifts in temperature are gradual and there are rarely significant polarities in London Temperature. 
+```{r}
+plot(diff(ts_time_series))
+```
